@@ -10,54 +10,24 @@ permissions:
 
 jobs:
   build:
+    name: Build Windows .geode for Geode v6
     runs-on: windows-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Prepare Geode SDK and build tools
-        shell: pwsh
-        run: |
-          $tools = Join-Path $env:RUNNER_TEMP 'TOOLS'
-          New-Item -ItemType Directory -Force -Path $tools | Out-Null
+      - name: Build mod with the official Geode action
+        id: build
+        uses: geode-sdk/build-geode-mod@61a56c697aea9655e3f31c6c1b83870431f30434
+        with:
+          sdk: 6.0.0-alpha.1
+          target: Win64
+          build-config: RelWithDebInfo
 
-          git clone --depth 1 --branch v6.0.0-alpha.1 --recurse-submodules https://github.com/geode-sdk/geode.git (Join-Path $tools 'geode-sdk-v6')
-          if ($LASTEXITCODE -ne 0) { throw 'No se pudo descargar el SDK de Geode v6.' }
-
-          git clone --depth 1 https://github.com/geode-sdk/bindings.git (Join-Path $tools 'geode-bindings')
-          if ($LASTEXITCODE -ne 0) { throw 'No se pudieron descargar los bindings.' }
-
-          $cliZip = Join-Path $tools 'geode-cli.zip'
-          Invoke-WebRequest 'https://github.com/geode-sdk/cli/releases/download/v4.0.0/geode-cli-v4.0.0-win.zip' -OutFile $cliZip
-
-          $cliDir = Join-Path $tools 'geode-cli'
-          Expand-Archive -Path $cliZip -DestinationPath $cliDir -Force
-
-          $cli = Get-ChildItem $cliDir -Recurse -Filter geode.exe | Select-Object -First 1
-          if (-not $cli) { throw 'No se encontró geode.exe dentro del archivo del CLI.' }
-
-          if ($cli.DirectoryName -ne $cliDir) {
-            Copy-Item $cli.FullName (Join-Path $cliDir 'geode.exe') -Force
-          }
-
-          "TOOLS=$tools" >> $env:GITHUB_ENV
-          "GEODE_SDK=$(Join-Path $tools 'geode-sdk-v6')" >> $env:GITHUB_ENV
-          "GEODE_BINDINGS_REPO_PATH=$(Join-Path $tools 'geode-bindings')" >> $env:GITHUB_ENV
-
-      - name: Install Geode loader binaries
-        shell: pwsh
-        run: |
-          Set-Location $env:GEODE_SDK
-          & "$env:TOOLS\geode-cli\geode.exe" sdk install-binaries --platform win
-          if ($LASTEXITCODE -ne 0) { throw 'No se pudieron instalar los binarios precompilados del loader de Geode.' }
-
-      - name: Compile .geode
-        shell: cmd
-        run: build.bat
-
-      - name: Upload compiled mod
+      - name: Upload compiled .geode
         uses: actions/upload-artifact@v4
         with:
           name: predictive-input-geode
-          path: build/**/*.geode
+          path: ${{ steps.build.outputs.build-output }}/*.geode
           if-no-files-found: error
