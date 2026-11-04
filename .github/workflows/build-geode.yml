@@ -29,11 +29,13 @@ jobs:
 
           $cliZip = Join-Path $tools 'geode-cli.zip'
           Invoke-WebRequest 'https://github.com/geode-sdk/cli/releases/download/v4.0.0/geode-cli-v4.0.0-win.zip' -OutFile $cliZip
+
           $cliDir = Join-Path $tools 'geode-cli'
           Expand-Archive -Path $cliZip -DestinationPath $cliDir -Force
 
           $cli = Get-ChildItem $cliDir -Recurse -Filter geode.exe | Select-Object -First 1
           if (-not $cli) { throw 'No se encontró geode.exe dentro del archivo del CLI.' }
+
           if ($cli.DirectoryName -ne $cliDir) {
             Copy-Item $cli.FullName (Join-Path $cliDir 'geode.exe') -Force
           }
@@ -42,12 +44,13 @@ jobs:
           "GEODE_SDK=$(Join-Path $tools 'geode-sdk-v6')" >> $env:GITHUB_ENV
           "GEODE_BINDINGS_REPO_PATH=$(Join-Path $tools 'geode-bindings')" >> $env:GITHUB_ENV
 
-                - name: Install Geode loader binaries
+      - name: Install Geode loader binaries
         shell: pwsh
         run: |
+          Set-Location $env:GEODE_SDK
           & "$env:TOOLS\geode-cli\geode.exe" sdk install-binaries --platform win
           if ($LASTEXITCODE -ne 0) { throw 'No se pudieron instalar los binarios precompilados del loader de Geode.' }
-          
+
       - name: Compile .geode
         shell: cmd
         run: build.bat
